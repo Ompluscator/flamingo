@@ -127,7 +127,7 @@ func (m *SessionModule) setSessionstoreOptions(options *sessions.Options) {
 	options.Domain = ""
 	options.Path = m.path
 	options.MaxAge = m.maxAge
-	options.Secure = true
+	options.Secure = m.secure
 	options.HttpOnly = true
 	switch m.sameSite {
 	case "strict":
