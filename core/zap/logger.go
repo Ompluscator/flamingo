@@ -4,27 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"go.elastic.co/apm"
+
 	"flamingo.me/flamingo/v3/framework/flamingo"
-	"flamingo.me/flamingo/v3/framework/opencensus"
 	"flamingo.me/flamingo/v3/framework/web"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
-	"go.opencensus.io/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-var (
-	logCount    = stats.Int64("flamingo/zap/logs", "Count of logs", stats.UnitDimensionless)
-	keyLevel, _ = tag.NewKey("level")
-)
-
-func init() {
-	if err := opencensus.View("flamingo/zap/logs", logCount, view.Count(), keyLevel); err != nil {
-		panic(err)
-	}
-}
 
 type (
 	// Logger is a Wrapper for the zap logger fulfilling the flamingo.Logger interface
@@ -45,10 +31,10 @@ type (
 // referer:       referer from request
 // request:       received payload from request
 func (l *Logger) WithContext(ctx context.Context) flamingo.Logger {
-	span := trace.FromContext(ctx)
+	span := apm.SpanFromContext(ctx)
 	fields := map[flamingo.LogKey]interface{}{
-		flamingo.LogKeyTraceID: span.SpanContext().TraceID.String(),
-		flamingo.LogKeySpanID:  span.SpanContext().SpanID.String(),
+		flamingo.LogKeyTraceID: span.TraceContext().Trace.String(),
+		flamingo.LogKeySpanID:  span.TraceContext().Span.String(),
 	}
 
 	req := web.RequestFromContext(ctx)
@@ -68,52 +54,40 @@ func (l *Logger) WithContext(ctx context.Context) flamingo.Logger {
 	return l.WithFields(fields)
 }
 
-func (l *Logger) record(level string) {
-	ctx, _ := tag.New(context.Background(), tag.Upsert(opencensus.KeyArea, l.configArea), tag.Upsert(keyLevel, level))
-	stats.Record(ctx, logCount.M(1))
-}
-
 // Debug logs a message at debug level
 func (l *Logger) Debug(args ...interface{}) {
-	l.record("Debug")
 	l.Logger.Debug(fmt.Sprint(args...))
 }
 
 // Debugf logs a message at debug level with format string
 func (l *Logger) Debugf(log string, args ...interface{}) {
-	l.record("Debug")
 	l.Logger.Debug(fmt.Sprintf(log, args...))
 }
 
 // Info logs a message at info level
 func (l *Logger) Info(args ...interface{}) {
-	l.record("Info")
 	l.Logger.Info(fmt.Sprint(args...))
 }
 
 // Warn logs a message at warn level
 func (l *Logger) Warn(args ...interface{}) {
-	l.record("Warn")
 	l.Logger.Warn(fmt.Sprint(args...))
 }
 
 // Error logs a message at error level
 func (l *Logger) Error(args ...interface{}) {
-	l.record("Error")
 	l.Logger.Error(fmt.Sprint(args...))
 }
 
 // Fatal logs a message at fatal level
 // The logger then calls os.Exit(1), even if logging at FatalLevel is disabled.
 func (l *Logger) Fatal(args ...interface{}) {
-	l.record("Fatal")
 	l.Logger.Fatal(fmt.Sprint(args...))
 }
 
 // Panic logs a message at panic level
 // The logger then panics, even if logging at PanicLevel is disabled.
 func (l *Logger) Panic(args ...interface{}) {
-	l.record("Panic")
 	l.Logger.Panic(fmt.Sprint(args...))
 }
 

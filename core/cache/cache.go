@@ -3,7 +3,7 @@ package cache
 import (
 	"time"
 
-	"go.opencensus.io/trace"
+	"go.elastic.co/apm"
 )
 
 type (
@@ -33,6 +33,6 @@ type (
 	loaderResponse struct {
 		data interface{}
 		meta *Meta
-		span trace.SpanContext
+		span *apm.Span
 	}
 )

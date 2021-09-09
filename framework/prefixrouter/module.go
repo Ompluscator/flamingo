@@ -8,13 +8,13 @@ import (
 	"path"
 	"time"
 
+	"go.elastic.co/apm/module/apmhttp"
+
 	"flamingo.me/dingo"
 	"flamingo.me/flamingo/v3/framework/config"
 	"flamingo.me/flamingo/v3/framework/flamingo"
-	"flamingo.me/flamingo/v3/framework/opencensus"
 	"flamingo.me/flamingo/v3/framework/web"
 	"github.com/spf13/cobra"
-	"go.opencensus.io/plugin/ochttp"
 )
 
 // Module for core/prefix_router
@@ -71,14 +71,14 @@ type serveCmdConfig struct {
 	FallbackHandlers []OptionalHandler `inject:"fallback,optional"`        // Optional Register a FallbackHandlers which is passed to the FrontendRouter
 }
 
-func (m *Module) serveCmd(area *config.Area, defaultmux *http.ServeMux, configuredURLPrefixSampler *opencensus.ConfiguredURLPrefixSampler, config *serveCmdConfig) *cobra.Command {
+func (m *Module) serveCmd(area *config.Area, defaultmux *http.ServeMux, config *serveCmdConfig) *cobra.Command {
 	var addr string
 
 	cmd := &cobra.Command{
 		Use:     "serve",
 		Short:   "run the prefix router",
 		Aliases: []string{"server"},
-		Run:     m.serve(area, defaultmux, &addr, configuredURLPrefixSampler, config.PrimaryHandlers, config.FallbackHandlers),
+		Run:     m.serve(area, defaultmux, &addr, config.PrimaryHandlers, config.FallbackHandlers),
 	}
 
 	cmd.Flags().StringVarP(&addr, "addr", "a", ":3210", "addr on which flamingo runs")
@@ -91,7 +91,6 @@ func (m *Module) serve(
 	root *config.Area,
 	defaultRouter *http.ServeMux,
 	addr *string,
-	configuredURLPrefixSampler *opencensus.ConfiguredURLPrefixSampler,
 	primaryHandlers []OptionalHandler,
 	fallbackHandlers []OptionalHandler,
 ) func(cmd *cobra.Command, args []string) {
@@ -135,35 +134,10 @@ func (m *Module) serve(
 			frontRouter.Add(prefix, routerHandler{area: area.Name, handler: areaRouter.Handler()})
 		}
 
-		whitelist := make([]string, 0, len(configuredURLPrefixSampler.Whitelist)*len(frontRouter.router)+1)
-		blacklist := make([]string, 0, len(configuredURLPrefixSampler.Blacklist)*len(frontRouter.router)+1)
-
-		// default routes
-		for _, p := range configuredURLPrefixSampler.Whitelist {
-			whitelist = append(whitelist, p.(string))
-		}
-		for _, p := range configuredURLPrefixSampler.Blacklist {
-			blacklist = append(blacklist, p.(string))
-		}
-
-		// prefixed routes
-		for k := range frontRouter.router {
-			for _, p := range configuredURLPrefixSampler.Whitelist {
-				whitelist = append(whitelist, k+p.(string))
-			}
-			for _, p := range configuredURLPrefixSampler.Blacklist {
-				blacklist = append(blacklist, k+p.(string))
-			}
-		}
-
 		m.logger.WithField("category", "prefixrouter").Info("Starting HTTP Server (Prefixrouter) at ", *addr, ".....")
 		m.server = &http.Server{
-			Addr: *addr,
-			Handler: &ochttp.Handler{
-				IsPublicEndpoint: true,
-				Handler:          frontRouter,
-				GetStartOptions:  opencensus.URLPrefixSampler(whitelist, blacklist, configuredURLPrefixSampler.AllowParentTrace),
-			},
+			Addr:    *addr,
+			Handler: apmhttp.Wrap(frontRouter),
 		}
 
 		e := m.listenAndServe()

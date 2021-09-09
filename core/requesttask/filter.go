@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"sync"
 
+	"go.elastic.co/apm"
+
 	"flamingo.me/flamingo/v3/framework/web"
-	"go.opencensus.io/trace"
 )
 
 type (
@@ -31,7 +32,7 @@ func TryDo(ctx context.Context, r *web.Request, task func(ctx context.Context, r
 		wg.Add(1)
 
 		go func() {
-			ctx, span := trace.StartSpan(ctx, "requestTask")
+			span, ctx := apm.StartSpan(ctx, "requestTask", "custom")
 			task(ctx, r)
 			span.End()
 			wg.Done()

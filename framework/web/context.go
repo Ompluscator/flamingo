@@ -3,12 +3,12 @@ package web
 import (
 	"context"
 
-	"go.opencensus.io/trace"
+	"go.elastic.co/apm"
 )
 
 // RunWithDetachedContext returns a context which is detached from the original deadlines, timeouts & co
 func RunWithDetachedContext(origCtx context.Context, fnc func(ctx context.Context)) {
-	origCtx, span := trace.StartSpan(origCtx, "flamingo/detachedContext")
+	span, origCtx := apm.StartSpan(origCtx, "flamingo/detachedContext", "custom")
 	defer span.End()
 
 	request := RequestFromContext(origCtx)
@@ -17,7 +17,7 @@ func RunWithDetachedContext(origCtx context.Context, fnc func(ctx context.Contex
 		session = request.Session()
 	}
 
-	ctx := ContextWithRequest(trace.NewContext(context.Background(), span), request)
+	ctx := ContextWithRequest(apm.ContextWithSpan(origCtx, span), request)
 	ctx = ContextWithSession(ctx, session)
 
 	fnc(ctx)

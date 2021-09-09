@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"go.elastic.co/apm/module/apmhttp"
+
 	"flamingo.me/dingo"
 	"flamingo.me/flamingo/v3/core/runtime"
 	"flamingo.me/flamingo/v3/core/zap"
@@ -18,10 +20,8 @@ import (
 	"flamingo.me/flamingo/v3/framework/cmd"
 	"flamingo.me/flamingo/v3/framework/config"
 	"flamingo.me/flamingo/v3/framework/flamingo"
-	"flamingo.me/flamingo/v3/framework/opencensus"
 	"flamingo.me/flamingo/v3/framework/web"
 	"github.com/spf13/cobra"
-	"go.opencensus.io/plugin/ochttp"
 )
 
 type (
@@ -320,7 +320,6 @@ type servemodule struct {
 	server            *http.Server
 	eventRouter       flamingo.EventRouter
 	logger            flamingo.Logger
-	configuredSampler *opencensus.ConfiguredURLPrefixSampler
 	certFile, keyFile string
 }
 
@@ -329,7 +328,6 @@ func (a *servemodule) Inject(
 	router *web.Router,
 	eventRouter flamingo.EventRouter,
 	logger flamingo.Logger,
-	configuredSampler *opencensus.ConfiguredURLPrefixSampler,
 ) {
 	a.router = router
 	a.eventRouter = eventRouter
@@ -337,7 +335,6 @@ func (a *servemodule) Inject(
 	a.server = &http.Server{
 		Addr: ":3322",
 	}
-	a.configuredSampler = configuredSampler
 }
 
 // Configure dependency injection
@@ -355,7 +352,7 @@ func serveProvider(a *servemodule, logger flamingo.Logger) *cobra.Command {
 		Short: "Default serve command - starts on Port 3322",
 		Run: func(cmd *cobra.Command, args []string) {
 			logger.Info(fmt.Sprintf("Starting HTTP Server at %s .....", a.server.Addr))
-			a.server.Handler = &ochttp.Handler{IsPublicEndpoint: true, Handler: a.router.Handler(), GetStartOptions: a.configuredSampler.GetStartOptions()}
+			a.server.Handler = apmhttp.Wrap(a.router.Handler())
 
 			err := a.listenAndServe()
 			if err != nil {

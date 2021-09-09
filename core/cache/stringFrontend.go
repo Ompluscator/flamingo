@@ -3,8 +3,9 @@ package cache
 import (
 	"time"
 
+	"go.elastic.co/apm"
+
 	"github.com/golang/groupcache/singleflight"
-	"go.opencensus.io/trace"
 )
 
 type (
@@ -48,7 +49,7 @@ func (sf *StringFrontend) load(key string, loader StringLoader) (string, error) 
 				Gracetime: 10 * time.Minute,
 			}
 		}
-		return loaderResponse{data, meta, trace.SpanContext{}}, err
+		return loaderResponse{data, meta, &apm.Span{}}, err
 	})
 
 	if err != nil {

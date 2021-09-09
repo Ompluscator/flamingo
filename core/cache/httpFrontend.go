@@ -10,9 +10,10 @@ import (
 	"net/http"
 	"time"
 
+	"go.elastic.co/apm"
+
 	"flamingo.me/flamingo/v3/framework/flamingo"
 	"github.com/golang/groupcache/singleflight"
-	"go.opencensus.io/trace"
 )
 
 type (
@@ -78,8 +79,8 @@ func (hf *HTTPFrontend) Get(ctx context.Context, key string, loader HTTPLoader) 
 		return nil, errors.New("NO backend in Cache")
 	}
 
-	ctx, span := trace.StartSpan(ctx, "flamingo/cache/httpFrontend/Get")
-	span.Annotate(nil, key)
+	span, ctx := apm.StartSpan(ctx, "flamingo/cache/httpFrontend/Get", "http")
+	span.SpanData.Subtype = key
 	defer span.End()
 
 	if entry, ok := hf.backend.Get(key); ok {
@@ -100,14 +101,14 @@ func (hf *HTTPFrontend) Get(ctx context.Context, key string, loader HTTPLoader) 
 }
 
 func (hf *HTTPFrontend) load(ctx context.Context, key string, loader HTTPLoader, keepExistingEntry bool) (cachedResponse, error) {
-	ctx, span := trace.StartSpan(ctx, "flamingo/cache/httpFrontend/load")
-	span.Annotate(nil, key)
+	span, ctx := apm.StartSpan(ctx, "flamingo/cache/httpFrontend/load", "http")
+	span.SpanData.Subtype = key
 	defer span.End()
 
 	data, err := hf.Do(key, func() (res interface{}, resultErr error) {
-		ctx, fetchRoutineSpan := trace.StartSpan(context.Background(), "flamingo/cache/httpFrontend/fetchRoutine")
-		fetchRoutineSpan.Annotate(nil, key)
-		defer fetchRoutineSpan.End()
+		fetchRoutineSpan, ctx := apm.StartSpan(context.Background(), "flamingo/cache/httpFrontend/fetchRoutine", "http")
+		span.SpanData.Subtype = key
+		defer span.End()
 
 		defer func() {
 			if err := recover(); err != nil {
@@ -127,7 +128,7 @@ func (hf *HTTPFrontend) load(ctx context.Context, key string, loader HTTPLoader,
 			}
 		}
 		if err != nil {
-			return loaderResponse{nil, meta, fetchRoutineSpan.SpanContext()}, err
+			return loaderResponse{nil, meta, fetchRoutineSpan}, err
 		}
 
 		response := data
@@ -140,7 +141,7 @@ func (hf *HTTPFrontend) load(ctx context.Context, key string, loader HTTPLoader,
 			body: body,
 		}
 
-		return loaderResponse{cached, meta, fetchRoutineSpan.SpanContext()}, err
+		return loaderResponse{cached, meta, fetchRoutineSpan}, err
 	})
 
 	keepExistingEntry = keepExistingEntry && (err != nil || data == nil)
@@ -155,7 +156,7 @@ func (hf *HTTPFrontend) load(ctx context.Context, key string, loader HTTPLoader,
 				Lifetime:  30 * time.Second,
 				Gracetime: 10 * time.Minute,
 			},
-			trace.SpanContext{},
+			&apm.Span{},
 		}
 	}
 
@@ -178,14 +179,6 @@ func (hf *HTTPFrontend) load(ctx context.Context, key string, loader HTTPLoader,
 			},
 		})
 	}
-
-	span.AddAttributes(trace.StringAttribute("parenttrace", data.(loaderResponse).span.TraceID.String()))
-	span.AddAttributes(trace.StringAttribute("parentspan", data.(loaderResponse).span.SpanID.String()))
-	//span.AddLink(trace.Link{
-	//	SpanID:  data.(loaderResponse).span.SpanID,
-	//	TraceID: data.(loaderResponse).span.TraceID,
-	//	Type:    trace.LinkTypeChild,
-	//})
 
 	return cached, err
 }
