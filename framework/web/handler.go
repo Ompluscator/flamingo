@@ -86,7 +86,7 @@ func panicToError(p interface{}) error {
 func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 	httpRequest.URL.Path = strings.TrimPrefix(httpRequest.URL.Path, h.prefix)
 
-	span, ctx := apm.StartSpan(httpRequest.Context(), "router/ServeHTTP", "http")
+	span, ctx := apm.StartSpan(httpRequest.Context(), "router/serveHTTP", "http")
 	defer span.End()
 
 	session, err := h.sessionStore.LoadByRequest(ctx, httpRequest)
@@ -94,7 +94,7 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 		h.logger.WithContext(ctx).Warn(err)
 	}
 
-	span, _ = apm.StartSpan(httpRequest.Context(), "router/matchRequest", "http")
+	matchSpan, _ := apm.StartSpan(ctx, "router/matchRequest", "http")
 	controller, params, handler := h.routerRegistry.matchRequest(httpRequest)
 
 	var handlerName string
@@ -119,34 +119,31 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 
 	h.eventRouter.Dispatch(ctx, &OnRequestEvent{req, rw})
 
-	span.End() // router/matchRequest
-
-	span, ctx = apm.StartSpan(httpRequest.Context(), "router/request", "http")
-	defer span.End()
+	matchSpan.End()
 
 	chain := &FilterChain{
 		filters: h.filter,
 		final: func(ctx context.Context, r *Request, rw http.ResponseWriter) (response Result) {
-			span, ctx := apm.StartSpan(ctx, "router/controller", "http")
-			defer span.End()
+			childSpan, childCtx := apm.StartSpan(ctx, "router/controller", "http")
+			defer childSpan.End()
 
 			defer func() {
 				if err := panicToError(recover()); err != nil {
 					response = h.routerRegistry.handler[FlamingoError].any(context.WithValue(ctx, RouterError, err), r)
-					span.Context.SetHTTPStatusCode(http.StatusInternalServerError)
+					childSpan.Context.SetHTTPStatusCode(http.StatusInternalServerError)
 				}
 			}()
 
-			defer h.eventRouter.Dispatch(ctx, &OnResponseEvent{OnRequestEvent{req, rw}, response})
+			defer h.eventRouter.Dispatch(childCtx, &OnResponseEvent{OnRequestEvent{req, rw}, response})
 
 			if c, ok := controller.method[req.Request().Method]; ok && c != nil {
-				response = c(ctx, r)
+				response = c(childCtx, r)
 			} else if controller.any != nil {
-				response = controller.any(ctx, r)
+				response = controller.any(childCtx, r)
 			} else {
 				err := fmt.Errorf("action for method %q not found and no \"any\" fallback", req.Request().Method)
-				response = h.routerRegistry.handler[FlamingoNotfound].any(context.WithValue(ctx, RouterError, err), r)
-				span.Context.SetHTTPStatusCode(http.StatusNotFound)
+				response = h.routerRegistry.handler[FlamingoNotfound].any(context.WithValue(childCtx, RouterError, err), r)
+				childSpan.Context.SetHTTPStatusCode(http.StatusNotFound)
 			}
 
 			return h.responder.completeResult(response)
@@ -163,7 +160,7 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 
 	var finalErr error
 	if result != nil {
-		span, ctx := apm.StartSpan(ctx, "router/responseApply", "http")
+		applySpan, _ := apm.StartSpan(ctx, "router/applyResponse", "http")
 
 		func() {
 			//catch panic in Apply only
@@ -175,7 +172,7 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 			finalErr = result.Apply(ctx, rw)
 		}()
 
-		span.End()
+		applySpan.End()
 	}
 
 	// ensure that the session has been saved in the backend
