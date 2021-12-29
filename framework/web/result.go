@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"go.elastic.co/apm"
+
 	"flamingo.me/flamingo/v3/framework/flamingo"
 )
 
@@ -171,6 +173,11 @@ func (r *Response) Apply(c context.Context, w http.ResponseWriter) error {
 	w.WriteHeader(int(r.Status))
 	if r.Body == nil {
 		return nil
+	}
+
+	span := apm.SpanFromContext(c)
+	if span != nil {
+		span.Context.SetHTTPStatusCode(int(r.Status))
 	}
 
 	_, err := io.Copy(w, r.Body)

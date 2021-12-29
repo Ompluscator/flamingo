@@ -91,6 +91,9 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 
 	session, err := h.sessionStore.LoadByRequest(ctx, httpRequest)
 	if err != nil {
+		e := apm.CaptureError(ctx, err)
+		e.SetSpan(span)
+		e.Send()
 		h.logger.WithContext(ctx).Warn(err)
 	}
 
@@ -129,8 +132,11 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 
 			defer func() {
 				if err := panicToError(recover()); err != nil {
+					e := apm.CaptureError(ctx, err)
+					e.SetSpan(childSpan)
+					e.Send()
 					response = h.routerRegistry.handler[FlamingoError].any(context.WithValue(ctx, RouterError, err), r)
-					childSpan.Context.SetHTTPStatusCode(http.StatusInternalServerError)
+					span.Context.SetHTTPStatusCode(http.StatusInternalServerError)
 				}
 			}()
 
@@ -141,9 +147,12 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 			} else if controller.any != nil {
 				response = controller.any(childCtx, r)
 			} else {
+				e := apm.CaptureError(ctx, err)
+				e.SetSpan(childSpan)
+				e.Send()
 				err := fmt.Errorf("action for method %q not found and no \"any\" fallback", req.Request().Method)
 				response = h.routerRegistry.handler[FlamingoNotfound].any(context.WithValue(childCtx, RouterError, err), r)
-				childSpan.Context.SetHTTPStatusCode(http.StatusNotFound)
+				span.Context.SetHTTPStatusCode(http.StatusNotFound)
 			}
 
 			return h.responder.completeResult(response)
@@ -155,21 +164,27 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 	if header, err := h.sessionStore.Save(ctx, req.Session()); err == nil {
 		AddHTTPHeader(rw.Header(), header)
 	} else {
+		e := apm.CaptureError(ctx, err)
+		e.SetSpan(span)
+		e.Send()
 		h.logger.WithContext(ctx).Warn(err)
 	}
 
 	var finalErr error
 	if result != nil {
-		applySpan, _ := apm.StartSpan(ctx, "router/applyResponse", "http")
+		applySpan, newCtx := apm.StartSpan(ctx, "router/applyResponse", "http")
 
 		func() {
 			//catch panic in Apply only
 			defer func() {
 				if err := panicToError(recover()); err != nil {
+					e := apm.CaptureError(ctx, err)
+					e.SetSpan(applySpan)
+					e.Send()
 					finalErr = err
 				}
 			}()
-			finalErr = result.Apply(ctx, rw)
+			finalErr = result.Apply(newCtx, rw)
 		}()
 
 		applySpan.End()
@@ -177,6 +192,10 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 
 	// ensure that the session has been saved in the backend
 	if _, err := h.sessionStore.Save(ctx, req.Session()); err != nil {
+		e := apm.CaptureError(ctx, err)
+		e.SetSpan(span)
+		e.Send()
+		finalErr = err
 		h.logger.WithContext(ctx).Warn(err)
 	}
 
@@ -188,6 +207,10 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 		finishErr = finalErr
 		defer func() {
 			if err := panicToError(recover()); err != nil {
+				e := apm.CaptureError(ctx, err)
+				e.SetSpan(span)
+				e.Send()
+				finalErr = err
 				finishErr = err
 				h.logger.WithContext(ctx).Error(err)
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -196,6 +219,10 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 		}()
 
 		if err := h.routerRegistry.handler[FlamingoError].any(context.WithValue(ctx, RouterError, finalErr), req).Apply(ctx, rw); err != nil {
+			e := apm.CaptureError(ctx, err)
+			e.SetSpan(span)
+			e.Send()
+			finalErr = err
 			panic(err)
 		}
 	}
