@@ -5,13 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/pact-foundation/pact-go/dsl"
-	"github.com/pact-foundation/pact-go/types"
 )
 
 // ErrNoPact error
@@ -39,6 +36,7 @@ func WithPact(t *testing.T, from, to string, fs ...func(*testing.T, *dsl.Pact)) 
 // pactSetup sets up pact environment for go tests
 func pactSetup(consumer, provider string) *dsl.Pact {
 	var pact = &dsl.Pact{
+		PactDir:           os.Getenv("PACT_DIR"),
 		Consumer:          consumer,
 		Provider:          provider,
 		LogLevel:          "WARN",
@@ -56,29 +54,6 @@ func pactTeardown(pact *dsl.Pact) error {
 	}
 
 	defer pact.Teardown()
-	if pactbroker := os.Getenv("PACT_BROKER_HOST"); pactbroker != "" {
-		// Write pact to file `<pact-go>/pacts/my_consumer-my_provider.json`
-		if err := pact.WritePact(); err != nil {
-			return err
-		}
-
-		p := dsl.Publisher{}
-		file := filepath.Join(pact.PactDir, fmt.Sprintf("%s-%s.json", strings.ToLower(pact.Consumer), strings.ToLower(pact.Provider)))
-
-		err := p.Publish(types.PublishRequest{
-			PactURLs:        []string{file},
-			PactBroker:      strings.TrimSuffix(pactbroker, "/"),
-			ConsumerVersion: os.Getenv("PACT_VERSION"),
-			Tags:            strings.Split(os.Getenv("PACT_TAGS"), ","),
-			BrokerUsername:  os.Getenv("PACT_BROKER_USERNAME"),
-			BrokerPassword:  os.Getenv("PACT_BROKER_PASSWORD"),
-			BrokerToken:     os.Getenv("PACT_BROKER_TOKEN"),
-		})
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
