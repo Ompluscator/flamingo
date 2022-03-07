@@ -39,9 +39,10 @@ func WithPact(t *testing.T, from, to string, fs ...func(*testing.T, *dsl.Pact)) 
 // pactSetup sets up pact environment for go tests
 func pactSetup(consumer, provider string) *dsl.Pact {
 	var pact = &dsl.Pact{
-		Consumer: consumer,
-		Provider: provider,
-		LogLevel: "WARN",
+		Consumer:          consumer,
+		Provider:          provider,
+		LogLevel:          "WARN",
+		PactFileWriteMode: "merge",
 	}
 
 	pact.Setup(true)
