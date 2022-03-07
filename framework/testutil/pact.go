@@ -1,17 +1,14 @@
 package testutil
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/pact-foundation/pact-go/dsl"
 	"github.com/pact-foundation/pact-go/types"
@@ -26,11 +23,7 @@ func WithPact(t *testing.T, from, to string, fs ...func(*testing.T, *dsl.Pact)) 
 		from = "flamingo"
 	}
 
-	pact, err := pactSetup(from, to)
-	if err != nil {
-		t.Skip(err)
-		return
-	}
+	pact := pactSetup(from, to)
 	// defer the pact teardown
 	defer func() {
 		if err := pactTeardown(pact); err != nil {
@@ -44,43 +37,23 @@ func WithPact(t *testing.T, from, to string, fs ...func(*testing.T, *dsl.Pact)) 
 }
 
 // pactSetup sets up pact environment for go tests
-func pactSetup(consumer, provider string) (*dsl.Pact, error) {
-	var pactdaemonport = 6666
-	var pactdaemonhost = "localhost"
-	var err error
-
-	if p := os.Getenv("PACT_DAEMON_PORT"); p != "" {
-		pactdaemonport, err = strconv.Atoi(p)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	if p := os.Getenv("PACT_DAEMON_HOST"); p != "" {
-		pactdaemonhost = p
-	}
-
-	var d net.Dialer
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	if _, err := d.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", pactdaemonhost, pactdaemonport)); err != nil {
-		return nil, ErrNoPact
-	}
-
+func pactSetup(consumer, provider string) *dsl.Pact {
 	var pact = &dsl.Pact{
-		Port:     pactdaemonport,
-		Host:     pactdaemonhost,
 		Consumer: consumer,
 		Provider: provider,
 		LogLevel: "WARN",
 	}
 
-	return pact, nil
+	pact.Setup(true)
+	return pact
 }
 
 // pactTeardown tears down the pact instance
 func pactTeardown(pact *dsl.Pact) error {
+	if err := pact.WritePact(); err != nil {
+		return err
+	}
+
 	defer pact.Teardown()
 	if pactbroker := os.Getenv("PACT_BROKER_HOST"); pactbroker != "" {
 		// Write pact to file `<pact-go>/pacts/my_consumer-my_provider.json`
@@ -95,9 +68,10 @@ func pactTeardown(pact *dsl.Pact) error {
 			PactURLs:        []string{file},
 			PactBroker:      strings.TrimSuffix(pactbroker, "/"),
 			ConsumerVersion: os.Getenv("PACT_VERSION"),
-			Tags:            append([]string{strings.ToLower(pact.Consumer), strings.ToLower(pact.Provider)}, strings.Split(os.Getenv("PACT_TAGS"), ",")...),
+			Tags:            strings.Split(os.Getenv("PACT_TAGS"), ","),
 			BrokerUsername:  os.Getenv("PACT_BROKER_USERNAME"),
 			BrokerPassword:  os.Getenv("PACT_BROKER_PASSWORD"),
+			BrokerToken:     os.Getenv("PACT_BROKER_TOKEN"),
 		})
 		if err != nil {
 			return err
@@ -108,41 +82,38 @@ func pactTeardown(pact *dsl.Pact) error {
 }
 
 // PactEncodeLike encodes a byte slice from json.Marshal or jsonpb into a pact type-like representation
-func PactEncodeLike(model []byte) string {
+func PactEncodeLike(model interface{}) dsl.Matcher {
+	payload, _ := json.Marshal(model)
 	var data interface{}
-	json.Unmarshal(model, &data)
+	json.Unmarshal(payload, &data)
 
-	return string(pactEncode(data))
+	return pactEncode(data)
 }
 
-func pactEncode(data interface{}) json.RawMessage {
+func pactEncode(data interface{}) dsl.Matcher {
 	switch data := data.(type) {
 	case string:
-		data = `"` + data + `"`
-		return json.RawMessage(dsl.Like(data))
+		return dsl.Like(data)
 
 	case int, float32, float64, bool, uint:
-		return json.RawMessage(dsl.Like(data))
+		return dsl.Like(data)
 
 	case map[string]interface{}:
+		result := dsl.StructMatcher{}
 		for k, v := range data {
-			data[k] = pactEncode(v)
+			result[k] = pactEncode(v)
 		}
-		b, _ := json.Marshal(data)
-		return json.RawMessage(dsl.Like(string(b)))
+		return result
 
 	case []interface{}:
 		if len(data) < 1 {
-			return json.RawMessage(dsl.EachLike(`null`, 0))
+			return dsl.EachLike(`null`, 0)
 		}
-		b, _ := json.Marshal(pactEncode(data[0]))
-		return json.RawMessage(dsl.EachLike(string(b), len(data)))
 
-	case json.RawMessage:
-		return data
+		return dsl.EachLike(pactEncode(data[0]), len(data))
 
 	case nil:
-		return json.RawMessage("null")
+		return dsl.Like("null")
 	}
 
 	panic(fmt.Sprintf("can not encode %T", data))
