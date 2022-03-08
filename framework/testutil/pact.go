@@ -37,6 +37,7 @@ func WithPact(t *testing.T, from, to string, fs ...func(*testing.T, *dsl.Pact)) 
 func pactSetup(consumer, provider string) *dsl.Pact {
 	var pact = &dsl.Pact{
 		PactDir:           os.Getenv("PACT_DIR"),
+		LogDir:            os.Getenv("PACT_LOG_DIR"),
 		Consumer:          consumer,
 		Provider:          provider,
 		LogLevel:          "WARN",
