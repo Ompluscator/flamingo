@@ -116,12 +116,10 @@ func (r *logger) Filter(ctx context.Context, req *web.Request, w http.ResponseWr
 			WithContext(ctx).
 			WithFields(
 				map[flamingo.LogKey]interface{}{
-					flamingo.LogKeyAccesslog:    1,
 					flamingo.LogKeyResponseCode: rwl.statusCode,
 					flamingo.LogKeyResponseTime: duration,
 					flamingo.LogKeyReferer:      req.Request().Referer(),
 					flamingo.LogKeyClientIP:     strings.Join(req.RemoteAddress(), ", "),
-					flamingo.LogKeyBusinessID:   req.Request().Header.Get("X-Business-ID"),
 				},
 			)
 
