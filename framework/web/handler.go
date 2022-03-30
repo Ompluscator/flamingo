@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"flamingo.me/flamingo/v3/framework/flamingo"
+	"github.com/dgrijalva/jwt-go"
 	"go.elastic.co/apm"
 )
 
@@ -124,6 +125,15 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 
 	matchSpan.End()
 
+	span.Context.SetLabel("handler", handlerName)
+	span.Context.SetLabel("username", h.username(httpRequest))
+	for k, v := range params {
+		span.Context.SetLabel(k, v)
+	}
+	for k, v := range httpRequest.URL.Query() {
+		span.Context.SetLabel(k, v)
+	}
+
 	chain := &FilterChain{
 		filters: h.filter,
 		final: func(ctx context.Context, r *Request, rw http.ResponseWriter) (response Result) {
@@ -226,4 +236,26 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 			panic(err)
 		}
 	}
+}
+
+func (h *handler) username(httpRequest *http.Request) string {
+	parser := &jwt.Parser{}
+
+	auth := httpRequest.Header.Get("Authorization")
+	authParts := strings.Split(auth, " ")
+	if len(authParts) != 2 || authParts[0] != "Bearer" {
+		return ""
+	}
+
+	token, _, err := parser.ParseUnverified(authParts[1], jwt.MapClaims{})
+	if err != nil {
+		return ""
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return ""
+	}
+
+	return fmt.Sprint(claims["preferred_username"])
 }
