@@ -35,6 +35,15 @@ func (m *Module) Configure(injector *dingo.Injector) {
 	}
 }
 
+func (m *Module) CueConfig() string {
+	return `
+flamingo: {
+	etcd: {
+		dialTimeout: int | *2
+		requestTimeout: int | 10
+	}`
+}
+
 // wrap to prevent the duplicated configuration issue
 type testModule struct {
 	Module

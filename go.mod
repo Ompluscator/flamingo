@@ -11,7 +11,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/gomodule/redigo v2.0.0+incompatible
-	github.com/google/go-cmp v0.5.0
+	github.com/google/go-cmp v0.5.5
 	github.com/gorilla/securecookie v1.1.1
 	github.com/gorilla/sessions v1.2.0
 	github.com/hashicorp/golang-lru v0.5.3
@@ -20,9 +20,7 @@ require (
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/nicksnyder/go-i18n v0.0.0-20180814031359-04f547cc50da
 	github.com/pact-foundation/pact-go v1.6.9
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
-	github.com/prometheus/procfs v0.0.10 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.5
@@ -31,11 +29,10 @@ require (
 	github.com/zemirco/memorystore v0.0.0-20160308183530-ecd57e5134f6
 	go.elastic.co/apm v1.13.1
 	go.elastic.co/apm/module/apmhttp v1.13.1
+	go.etcd.io/etcd/client/v3 v3.5.4
 	go.uber.org/automaxprocs v1.3.0
-	go.uber.org/multierr v1.5.0 // indirect
-	go.uber.org/zap v1.14.0
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+	go.uber.org/zap v1.17.0
+	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/appengine v1.6.1 // indirect
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/square/go-jose.v2 v2.1.9 // indirect
 )

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -8,10 +9,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/parser"
 	"github.com/ghodss/yaml"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type (
@@ -173,7 +176,8 @@ func loadCueFile(area *Area, filename string) error {
 	return nil
 }
 
-var regex = regexp.MustCompile(`%%ENV:([^%\n]+)%%(([^%\n]+)%%)?`)
+var envRegex = regexp.MustCompile(`%%ENV:([^%\n]+)%%(([^%\n]+)%%)?`)
+var etcdRegex = regexp.MustCompile(`%%ETCD:([^%\n]+)%%(([^%\n]+)%%)?`)
 
 func loadYamlFile(area *Area, filename string) error {
 	config, err := ioutil.ReadFile(filename + ".yml")
@@ -189,13 +193,58 @@ func loadYamlFile(area *Area, filename string) error {
 	return fmt.Errorf("can not load %s.yml nor %s.yaml", filename, filename)
 }
 
+func getEtcdClient(config []byte) (*clientv3.Client, time.Duration) {
+	cfg := make(Map)
+	if err := yaml.Unmarshal(config, &cfg); err != nil {
+		panic(err)
+	}
+
+	temp := make(Map)
+	if err := temp.Add(cfg); err != nil {
+		panic(err)
+	}
+
+	cli, err := clientv3.New(clientv3.Config{
+		DialTimeout: 2 * time.Second,
+		Endpoints:   []string{"127.0.0.1:2379"},
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return cli, 10 * time.Second
+}
+
 func loadYamlConfig(area *Area, config []byte) error {
-	config = regex.ReplaceAllFunc(
+	config = envRegex.ReplaceAllFunc(
 		config,
 		func(a []byte) []byte {
-			value := os.Getenv(string(regex.FindSubmatch(a)[1]))
+			value := os.Getenv(string(envRegex.FindSubmatch(a)[1]))
 			if value == "" {
-				value = string(regex.FindSubmatch(a)[3])
+				value = string(envRegex.FindSubmatch(a)[3])
+			}
+			return []byte(value)
+		},
+	)
+
+	cli, requestTimeout := getEtcdClient(config)
+	defer cli.Close()
+	ctx, _ := context.WithTimeout(context.Background(), requestTimeout)
+	config = etcdRegex.ReplaceAllFunc(
+		config,
+		func(a []byte) []byte {
+			submatch := etcdRegex.FindSubmatch(a)
+			key := string(submatch[1])
+			response, err := cli.Get(ctx, key)
+			if err != nil {
+				panic(err)
+			}
+
+			var value string
+			if len(response.Kvs) > 0 {
+				value = string(response.Kvs[0].Value)
+			} else if len(submatch) > 3 {
+				value = string(submatch[3])
 			}
 			return []byte(value)
 		},
