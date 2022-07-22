@@ -215,7 +215,7 @@ func getEtcdClient(config []byte) (*clientv3.Client, time.Duration) {
 	}
 
 	cli, err := clientv3.New(clientv3.Config{
-		DialTimeout: 2 * time.Second,
+		DialTimeout: 20 * time.Second,
 		Endpoints:   []string{fmt.Sprint(host)},
 		Username:    fmt.Sprint(username),
 		Password:    fmt.Sprint(password),
