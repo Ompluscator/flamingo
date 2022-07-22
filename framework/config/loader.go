@@ -193,7 +193,7 @@ func loadYamlFile(area *Area, filename string) error {
 	return fmt.Errorf("can not load %s.yml nor %s.yaml", filename, filename)
 }
 
-func getEtcdClient(config []byte) (*clientv3.Client, time.Duration) {
+func getEtcdClient(config []byte) (*clientv3.Client, time.Duration, bool) {
 	cfg := make(Map)
 	if err := yaml.Unmarshal(config, &cfg); err != nil {
 		panic(err)
@@ -204,12 +204,22 @@ func getEtcdClient(config []byte) (*clientv3.Client, time.Duration) {
 		panic(err)
 	}
 
-	host, _ := cfg.Get("flamingo.etcd.host")
-	username, ok := cfg.Get("flamingo.etcd.username")
+	subCfg, ok := cfg.Get("flamingo")
+	if !ok {
+		return nil, 0, false
+	}
+
+	subCfg, ok = subCfg.(map[string]interface{})["etcd"]
+	if !ok {
+		return nil, 0, false
+	}
+
+	host, _ := subCfg.(map[string]interface{})["host"]
+	username, ok := subCfg.(map[string]interface{})["username"]
 	if !ok {
 		username = ""
 	}
-	password, ok := cfg.Get("flamingo.etcd.password")
+	password, ok := subCfg.(map[string]interface{})["password"]
 	if !ok {
 		password = ""
 	}
@@ -224,7 +234,7 @@ func getEtcdClient(config []byte) (*clientv3.Client, time.Duration) {
 		panic(err)
 	}
 
-	return cli, 10 * time.Second
+	return cli, 10 * time.Second, true
 }
 
 func loadYamlConfig(area *Area, config []byte) error {
@@ -239,28 +249,31 @@ func loadYamlConfig(area *Area, config []byte) error {
 		},
 	)
 
-	cli, requestTimeout := getEtcdClient(config)
-	defer cli.Close()
-	ctx, _ := context.WithTimeout(context.Background(), requestTimeout)
-	config = etcdRegex.ReplaceAllFunc(
-		config,
-		func(a []byte) []byte {
-			submatch := etcdRegex.FindSubmatch(a)
-			key := string(submatch[1])
-			response, err := cli.Get(ctx, key)
-			if err != nil {
-				panic(err)
-			}
+	cli, requestTimeout, ok := getEtcdClient(config)
+	if ok {
+		defer cli.Close()
+		config = etcdRegex.ReplaceAllFunc(
+			config,
+			func(a []byte) []byte {
+				submatch := etcdRegex.FindSubmatch(a)
+				key := string(submatch[1])
+				ctx, canFn := context.WithTimeout(context.Background(), requestTimeout)
+				defer canFn()
+				response, err := cli.Get(ctx, key)
+				if err != nil {
+					panic(err)
+				}
 
-			var value string
-			if len(response.Kvs) > 0 {
-				value = string(response.Kvs[0].Value)
-			} else if len(submatch) > 3 {
-				value = string(submatch[3])
-			}
-			return []byte(value)
-		},
-	)
+				var value string
+				if len(response.Kvs) > 0 {
+					value = string(response.Kvs[0].Value)
+				} else if len(submatch) > 3 {
+					value = string(submatch[3])
+				}
+				return []byte(value)
+			},
+		)
+	}
 
 	cfg := make(Map)
 	if err := yaml.Unmarshal(config, &cfg); err != nil {
