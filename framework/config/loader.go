@@ -204,9 +204,21 @@ func getEtcdClient(config []byte) (*clientv3.Client, time.Duration) {
 		panic(err)
 	}
 
+	host, _ := cfg.Get("flamingo.etcd.host")
+	username, ok := cfg.Get("flamingo.etcd.username")
+	if !ok {
+		username = ""
+	}
+	password, ok := cfg.Get("flamingo.etcd.password")
+	if !ok {
+		password = ""
+	}
+
 	cli, err := clientv3.New(clientv3.Config{
 		DialTimeout: 2 * time.Second,
-		Endpoints:   []string{"127.0.0.1:2379"},
+		Endpoints:   []string{fmt.Sprint(host)},
+		Username:    fmt.Sprint(username),
+		Password:    fmt.Sprint(password),
 	})
 	if err != nil {
 		panic(err)
