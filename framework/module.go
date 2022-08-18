@@ -91,6 +91,8 @@ func (r *routes) Routes(registry *web.RouterRegistry) {
 // CueConfig definition for flamingo framework
 func (*InitModule) CueConfig() string {
 	return `
+import "strings"
+
 flamingo: {
 	debug: mode: bool | *true
 	router: {

@@ -79,7 +79,7 @@ func Load(root *Area, basedir string, options ...LoadOption) error {
 		if err := root.loadConfig(false, false); err != nil {
 			log.Println(err)
 		}
-		config.cueDebugCallback(format.Node(root.cueInstance.Lookup(config.cueDebugPath...).Syntax(), format.Simplify()))
+		config.cueDebugCallback(format.Node(root.cueValue.Lookup(config.cueDebugPath...).Syntax(), format.Simplify()))
 	}
 	return root.loadConfig(config.legacy, config.logLegacy)
 }

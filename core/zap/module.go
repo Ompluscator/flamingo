@@ -160,8 +160,8 @@ func (subscriber *shutdownEventSubscriber) Notify(_ context.Context, event flami
 func (m *Module) CueConfig() string {
 	// language=cue
 	return `
-core zap: {
-	loglevel: *"Debug" | "Info" | "Warn" | "Error" | "DPanic" | "Panic" | "Fatal"
+core: zap: {
+	loglevel: *"Info" | "Debug" | "Warn" | "Error" | "DPanic" | "Panic" | "Fatal"
 	sampling: {
 		enabled: bool | *true
 		initial: int | *100 

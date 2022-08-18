@@ -3,7 +3,7 @@ module flamingo.me/flamingo/v3
 go 1.13
 
 require (
-	cuelang.org/go v0.0.15
+	cuelang.org/go v0.4.3
 	flamingo.me/dingo v0.2.9
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff
 	github.com/coreos/go-oidc v2.0.0+incompatible
@@ -18,12 +18,16 @@ require (
 	github.com/labstack/gommon v0.0.0-20180613044413-d6898124de91
 	github.com/leekchan/accounting v0.0.0-20191104051123-0b9b0bd19c36
 	github.com/mattn/go-colorable v0.1.4 // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/nicksnyder/go-i18n v0.0.0-20180814031359-04f547cc50da
 	github.com/pact-foundation/pact-go v1.6.9
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
+	github.com/rogpeppe/testscript v1.1.0 // indirect
 	github.com/satori/go.uuid v1.2.0
-	github.com/spf13/cobra v0.0.6
+	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
+	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.4.0 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/zemirco/memorystore v0.0.0-20160308183530-ecd57e5134f6

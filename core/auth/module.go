@@ -97,7 +97,7 @@ func (*WebModule) CueConfig() string {
 	return `
 core: auth: web: {
 	broker: [...{broker: string, typ: string}]
-	debugController: bool | *flamingo.debug.mode
+	debugController: bool | *false
 }
 `
 }

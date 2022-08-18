@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/errors"
 	"flamingo.me/dingo"
 )
@@ -31,7 +32,7 @@ type (
 		LoadedConfig  Map // Deprecated: empty and should not be used anymore
 
 		cueBuildInstance *build.Instance
-		cueInstance      *cue.Instance
+		cueValue         cue.Value
 		cueConfig        *ast.File
 		defaultConfig    Map
 		loadedConfig     Map
@@ -133,7 +134,7 @@ func moduleName(m dingo.Module) string {
 	for tm.Kind() == reflect.Ptr {
 		tm = tm.Elem()
 	}
-	return tm.PkgPath() + "." + tm.Name()
+	return tm.PkgPath() + ".cue"
 }
 
 func cueError(err error) error {
@@ -150,11 +151,10 @@ func (area *Area) loadCueConfig() error {
 		return cueError(err)
 	}
 
+	var pkgs string
 	for _, module := range area.Modules {
 		if cuemodule, ok := module.(CueConfigModule); ok {
-			if err := area.cueBuildInstance.AddFile(moduleName(module), cuemodule.CueConfig()); err != nil {
-				return fmt.Errorf("loading config for %s failed: %w", moduleName(module), cueError(err))
-			}
+			pkgs = fmt.Sprintf("%s\n%s", pkgs, cuemodule.CueConfig())
 		}
 	}
 
@@ -165,7 +165,9 @@ func (area *Area) loadCueConfig() error {
 	}
 	envFile += "} } }\n"
 
-	if err := area.cueBuildInstance.AddFile("flamingo-os-env-file", envFile); err != nil {
+	pkgs = fmt.Sprintf("%s\n%s", pkgs, envFile)
+
+	if err := area.cueBuildInstance.AddFile("flamingo.cue", pkgs); err != nil {
 		return fmt.Errorf("%s: %w", area.Name, cueError(err))
 	}
 
@@ -200,7 +202,7 @@ func (area *Area) checkLegacyConfig(warn bool) {
 							log.Fatal(err)
 						}
 					} else if ok && !reflect.DeepEqual(oldval, newval) {
-						// don't warn on complext/map type
+						// don't warn on complex/map type
 						if _, ok := newval.(Map); !ok {
 							log.Fatalf("ERROR: legacy config mismatch for new %q=%q and old %q=%q", new, newval, old, oldval)
 						}
@@ -274,19 +276,13 @@ func (area *Area) loadConfig(legacy, logLegacy bool) error {
 		}
 	}
 
-	var err error
-	area.cueInstance, err = new(cue.Runtime).Build(area.cueBuildInstance)
-	if err != nil {
-		return cueError(err)
-	}
+	cCtx := cuecontext.New()
+	area.cueValue = cCtx.BuildInstance(area.cueBuildInstance)
 
-	area.cueInstance, err = area.cueInstance.Fill(area.Configuration)
-	if err != nil {
-		return fmt.Errorf("%s: %w", area.Name, cueError(err))
-	}
+	area.cueValue = area.cueValue.FillPath(cue.ParsePath("configuration"), area.Configuration)
 
 	m := make(Map)
-	if err := area.cueInstance.Value().Decode(&m); err != nil {
+	if err := area.cueValue.Decode(&m); err != nil {
 		return fmt.Errorf("%s: %w", area.Name, cueError(err))
 	}
 	if err := area.Configuration.Add(m); err != nil {
