@@ -129,14 +129,6 @@ func resolveDependencies(modules []dingo.Module, known map[interface{}]struct{})
 	return final
 }
 
-func moduleName(m dingo.Module) string {
-	tm := reflect.TypeOf(m)
-	for tm.Kind() == reflect.Ptr {
-		tm = tm.Elem()
-	}
-	return tm.PkgPath() + ".cue"
-}
-
 func cueError(err error) error {
 	if p, ok := err.(errors.Error); ok {
 		return fmt.Errorf("%s: %w", p.Position(), err)

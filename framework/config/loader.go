@@ -171,6 +171,21 @@ func loadCueFile(area *Area, filename string) error {
 	if err != nil {
 		return err
 	}
+	if area.cueConfig == nil {
+		envFile := "flamingo: { os: { env: { \n[string]: string\n"
+		for _, v := range os.Environ() {
+			v := strings.SplitN(v, "=", 2)
+			envFile += fmt.Sprintf("\"%s\": \"%s\"\n", esc(v[0]), esc(v[1]))
+		}
+		envFile += "} } }\n"
+
+		parsed, err := parser.ParseFile("env.cue", envFile)
+		if err != nil {
+			return err
+		}
+		area.cueConfig = parsed
+	}
+
 	area.cueConfig = cueAstMergeFile(area.cueConfig, file)
 
 	return nil
