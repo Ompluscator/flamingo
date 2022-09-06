@@ -27,8 +27,8 @@ func (m *Module) CueConfig() string {
 	return `
 // general config
 core: gotemplate: engine: {
-	templates basepath: string | *"templates"
-	layout dir: string | *""
+	templates: basepath: string | *"templates"
+	layout: dir: string | *""
 }
 `
 }
