@@ -1,8 +1,8 @@
 // Package framework provides the most necessary basics, such as
-//  - service_locator
-//  - router
-//  - web (including context and response)
-//  - web/responder
+//   - service_locator
+//   - router
+//   - web (including context and response)
+//   - web/responder
 //
 // Additionally it provides a router at /_flamingo/json/{handler} for convenient access to DataControllers
 // Additionally it registers two template functions, `get(...)` and `url(...)`
@@ -92,34 +92,5 @@ func (r *routes) Routes(registry *web.RouterRegistry) {
 func (*InitModule) CueConfig() string {
 	return `
 import "strings"
-
-flamingo: {
-	debug: mode: bool | *true
-	router: {
-		notfound: string | *"flamingo.notfound"
-		error: string | *"flamingo.error"
-		timeout: int | *60000
-		host?: string
-		path?: string
-	}
-	template: {
-		err403: string | *"error/403"
-		err404: string | *"error/404"
-		errWithCode: string | *"error/withCode"
-		err503: string | *"error/503"
-	}
-	session: {
-		name: string | *"flamingo"
-		saveMode: *"Always" | "OnRead" | "OnWrite" 
-	}
-}
 `
-}
-
-// FlamingoLegacyConfigAlias maps legacy configuration to new
-func (*InitModule) FlamingoLegacyConfigAlias() map[string]string {
-	return map[string]string{
-		"debug.mode":   "flamingo.debug.mode",
-		"session.name": "flamingo.session.name",
-	}
 }

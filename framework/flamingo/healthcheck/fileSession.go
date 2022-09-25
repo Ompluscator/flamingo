@@ -15,7 +15,7 @@ var _ healthcheck.Status = &FileSession{}
 
 // Inject configuration for session backend
 func (s *FileSession) Inject(cfg *struct {
-	FileName string `inject:"config:flamingo.session.file"`
+	FileName string `inject:"config:session.file"`
 }) {
 	s.fileName = cfg.FileName
 }

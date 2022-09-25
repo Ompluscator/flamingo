@@ -68,7 +68,7 @@ func (r *Router) Inject(
 		Host        string `inject:"config:flamingo.router.host,optional"`
 		Path        string `inject:"config:flamingo.router.path,optional"`
 		External    string `inject:"config:flamingo.router.external,optional"`
-		SessionName string `inject:"config:flamingo.session.name,optional"`
+		SessionName string `inject:"config:session.name,optional"`
 	},
 	sessionStore *SessionStore,
 	eventRouter flamingo.EventRouter,
