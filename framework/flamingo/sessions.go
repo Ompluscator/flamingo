@@ -35,22 +35,22 @@ type SessionModule struct {
 // Inject dependencies
 func (m *SessionModule) Inject(config *struct {
 	// session config is optional to allow usage of the DefaultConfig
-	Backend  string `inject:"config:session.backend"`
-	Secret   string `inject:"config:session.secret"`
-	FileName string `inject:"config:session.file,optional"`
-	Secure   bool   `inject:"config:session.cookie.secure"`
-	SameSite string `inject:"config:session.cookie.sameSite"`
+	Backend  string `inject:"config:flamingo.session.backend"`
+	Secret   string `inject:"config:flamingo.session.secret"`
+	FileName string `inject:"config:flamingo.session.file"`
+	Secure   bool   `inject:"config:flamingo.session.cookie.secure"`
+	SameSite string `inject:"config:flamingo.session.cookie.sameSite"`
 	// float64 is used due to the injection as config from json - int is not possible on this
-	StoreLength          float64 `inject:"config:session.store.length,optional"`
-	MaxAge               float64 `inject:"config:session.max.age"`
-	Path                 string  `inject:"config:session.cookie.path"`
-	RedisURL             string  `inject:"config:session.redis.url,optional"`
-	RedisHost            string  `inject:"config:session.redis.host,optional"`
-	RedisPassword        string  `inject:"config:session.redis.password,optional"`
-	RedisIdleConnections float64 `inject:"config:session.redis.idle.connections,optional"`
-	RedisMaxAge          float64 `inject:"config:session.redis.maxAge,optional"`
-	RedisDatabase        string  `inject:"config:session.redis.database,optional"`
-	CheckSession         bool    `inject:"config:session.healthcheck,optional"`
+	StoreLength          float64 `inject:"config:flamingo.session.store.length"`
+	MaxAge               float64 `inject:"config:flamingo.session.max.age"`
+	Path                 string  `inject:"config:flamingo.session.cookie.path"`
+	RedisURL             string  `inject:"config:flamingo.session.redis.url"`
+	RedisHost            string  `inject:"config:flamingo.session.redis.host"`
+	RedisPassword        string  `inject:"config:flamingo.session.redis.password"`
+	RedisIdleConnections float64 `inject:"config:flamingo.session.redis.idle.connections"`
+	RedisMaxAge          float64 `inject:"config:flamingo.session.redis.maxAge"`
+	RedisDatabase        string  `inject:"config:flamingo.session.redis.database,optional"`
+	CheckSession         bool    `inject:"config:flamingo.session.healthcheck,optional"`
 }) {
 	m.backend = config.Backend
 	m.secret = config.Secret
@@ -138,6 +138,51 @@ func (m *SessionModule) setSessionstoreOptions(options *sessions.Options) {
 		options.SameSite = http.SameSiteLaxMode
 	default:
 		options.SameSite = http.SameSiteDefaultMode
+	}
+}
+
+// CueConfig defines the session config scheme
+func (*SessionModule) CueConfig() string {
+	return `
+flamingo: session: {
+	backend: *"memory" | "redis" | "file"
+	secret: string | *"flamingosecret"
+	file: string | *"/sessions"
+	store: length: float | int | *(1024 * 1024)
+	max: age: float | int | *(60 * 60 * 24 * 30)
+	cookie: {
+		secure: bool | *true
+		path: string | *"/"
+		sameSite: string | *"lax"
+	}
+	redis: {
+		url: string | *""
+		host: string | *"redis"
+		password: string | *""
+		idle: connections: float | int | *10
+		maxAge: float | int | *(60 * 60 * 24 * 30)
+		database: string | *""
+	}
+}
+`
+}
+
+// FlamingoLegacyConfigAlias maps legacy config to new
+func (m *SessionModule) FlamingoLegacyConfigAlias() map[string]string {
+	return map[string]string{
+		"session.backend":                "flamingo.session.backend",
+		"session.secret":                 "flamingo.session.secret",
+		"session.file":                   "flamingo.session.file",
+		"session.store.length":           "flamingo.session.store.length",
+		"session.max.age":                "flamingo.session.max.age",
+		"session.cookie.secure":          "flamingo.session.cookie.secure",
+		"session.cookie.path":            "flamingo.session.cookie.path",
+		"session.redis.url":              "flamingo.session.redis.url",
+		"session.redis.host":             "flamingo.session.redis.host",
+		"session.redis.password":         "flamingo.session.redis.password",
+		"session.redis.idle.connections": "flamingo.session.redis.idle.connections",
+		"session.redis.maxAge":           "flamingo.session.redis.maxAge",
+		"core.healthcheck.checkSession":  "flamingo.session.healthcheck",
 	}
 }
 

@@ -27,8 +27,8 @@ type SessionStore struct {
 // Inject dependencies.
 func (s *SessionStore) Inject(logger flamingo.Logger, cfg *struct {
 	SessionStore sessions.Store `inject:",optional"`
-	SessionName  string         `inject:"config:session.name,optional"`
-	SaveMode     string         `inject:"config:session.saveMode,optional"`
+	SessionName  string         `inject:"config:flamingo.session.name,optional"`
+	SaveMode     string         `inject:"config:flamingo.session.saveMode"`
 }) *SessionStore {
 	s.sessionStore = cfg.SessionStore
 	s.sessionName = cfg.SessionName
