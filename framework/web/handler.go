@@ -157,10 +157,10 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, httpRequest *http.Request) {
 			} else if controller.any != nil {
 				response = controller.any(childCtx, r)
 			} else {
+				err := fmt.Errorf("action for method %q not found and no \"any\" fallback", req.Request().Method)
 				e := apm.CaptureError(ctx, err)
 				e.SetSpan(childSpan)
 				e.Send()
-				err := fmt.Errorf("action for method %q not found and no \"any\" fallback", req.Request().Method)
 				response = h.routerRegistry.handler[FlamingoNotfound].any(context.WithValue(childCtx, RouterError, err), r)
 				span.Context.SetHTTPStatusCode(http.StatusNotFound)
 			}
